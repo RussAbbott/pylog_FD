@@ -1,52 +1,89 @@
+from random import randint, sample
 from typing import List, Tuple
 
 from control_structures import Trace
-from logic_variables import Var
+# from logic_variables import Var
 
 # Use this for all non-lv tests.
 # Is there a better example?
-sets = [{1, 2, 3}, {1, 2, 4}, {1}]
+# sets = [{1, 2, 3}, {1, 2, 4}, {1}]
+n = 5
+alpha_start = randint(97, 97+26-n)
+# sets = [set(sample(range(n), 3)) for _ in range(n)]
+sets = [set(chr(alpha_start+k) for k in sample(range(n), 3)) for _ in range(n)]
 
 
-def all_diff(instans):
-    ranges = [v.range for v in instans]
-    return len(flatten_sets_to_set(ranges)) == len(ranges)
+class FD_Var:
+  """
+  A Finite Domain variable
+  """
+
+  def __init__(self, name=None, init_range=frozenset({})):
+    # self.unification_chain_next points to the next element on the unification_chain, if any.
+    self.name = name
+    self.range = init_range
+    # Make it a tuple so that we can make a set of FD_Vars
+    self.range_stack = ()
+    # super().__init__()
+
+  def __str__(self):
+    name_part = '' if self.name is None else self.name + ': '
+    (left, right) = ("{", "}")
+    return f'{name_part}{left}{", ".join([str(x) for x in self.range])}{right}'
+
+  def undo_update(self):
+    self.range = self.range_stack[-1]
+    self.range_stack = self.range_stack[:-1]
+
+  def update_range(self, new_range):
+    self.range_stack = self.range_stack + (self.range, )
+    self.range = new_range
+
+
+class All_Different:
+    def __init__(self, vars):
+        self.vars = vars
+        self.used = set()
+
+    def __str__(self):
+        return f'<{", ".join([v.name for v in vars])}>'
+
+    def all_diff(self):
+        instantiated_vars = [v for v in self.vars if len(v.range) == 1]
+        vals = {list(v.range)[0] for v in instantiated_vars}
+        return len(vals) == len(instantiated_vars)
 
 
 def flatten_sets_to_set(sets):
     return {elt for set in sets for elt in set}
 
 
-# unassigned = '_'
-def instan_uninstan(vars: Tuple[Var]) -> Tuple[List[Var], List[Var], List[Var]]:
-    """ Must return the actual list because the result is used twice.  """
-    (empty, instan, uninstan) = ([], [], [])
-    for v in vars:
-        list_to_add_to = empty if len(v.range) == 0 else instan if len(v.range) == 1 else uninstan
-        list_to_add_to += [v]
-        # list_to_add_to.append(v)
-    return (empty, instan, uninstan)
-
-
 @Trace
-def tnvsl_FD(vars: Tuple[Var]):
-  (empty, instan, uninstan) = instan_uninstan(vars)
-  if empty or not all_diff(instan): return None
-  elif not uninstan: return vars
+def tnvsl_FD(vars: Tuple[FD_Var], all_diffs: List[All_Different]):
 
-  nxt_var = list(uninstan)[0]
-  for val in nxt_var.range:
-      nxt_var.update_range({val})
-      full_tnvsl = tnvsl_FD(vars)
-      if full_tnvsl is not None: return full_tnvsl
-      else:
-          nxt_var.undo_update()
+    @Trace
+    def tnvsl_FD_aux(vars: Tuple[FD_Var]):
+      if any(v for v in vars if not(v.range)): return None
+      if any(ad for ad in all_diffs if not ad.all_diff()): return None
+      uninstan_vars = [v for v in vars if len(v.range) > 1]
+      if not uninstan_vars: return vars
+
+      nxt_var = list(uninstan_vars)[0]
+      for val in nxt_var.range:
+          nxt_var.update_range({val})
+          full_tnvsl = tnvsl_FD_aux(vars)
+          if full_tnvsl is not None: return full_tnvsl
+          else: nxt_var.undo_update()
+
+    return tnvsl_FD_aux(vars)
 
 
 if __name__ == '__main__':
-    vars = tuple([Var(set) for set in sets])
-    print(f'\n{"-" * 75}')
-    print(f"\nFirst transversal: {Trace.to_str(tnvsl_FD(vars))}")
+    vars = tuple([FD_Var('V' + str(i+1), set) for (i, set) in enumerate(sets)])
+    all_diff = All_Different(vars)
+    print(f'\n{"=" * 50}')
+    print(f"\nFirst transversal: {Trace.to_str(tnvsl_FD(vars, [all_diff]))}")
+    print(f'{"=" * 50}')
 
 
 # @Trace

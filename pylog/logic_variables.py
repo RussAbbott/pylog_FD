@@ -231,9 +231,11 @@ class Var(Term):
   A logic variable
   """
 
-  def __init__(self):
+  def __init__(self, init_range=None):
     # self.unification_chain_next points to the next element on the unification_chain, if any.
     self.unification_chain_next = None
+    self.range = init_range
+    self.range_stack = []
     super().__init__()
 
   def __add__(self, other):
@@ -256,6 +258,9 @@ class Var(Term):
     assert isinstance(self_euc, Sized)
     return None if not hasattr(self_euc, '__len__') or self == self_euc else len(self_euc)
 
+  def __str__(self):
+    return f'{self.range}' if self.range is not None else super().__str__()
+
   def _has_unification_chain_next(self) -> bool:
     # Is this the end of the unification_chain?
     return self.unification_chain_next is not None
@@ -270,11 +275,19 @@ class Var(Term):
     Trail_End_Var = self.unification_chain_end( )
     return not isinstance(Trail_End_Var, Var) and Trail_End_Var.is_instantiated()
 
+  def undo_update(self):
+    self.range = self.range_stack[-1]
+    self.range_stack = self.range_stack[:-1]
+
   def unification_chain_end(self):
     """
     return: the Term, whatever it is, at the end of this Var's unification unification_chain.
     """
     return self.unification_chain_next.unification_chain_end( ) if self._has_unification_chain_next( ) else self
+
+  def update_range(self, new_range):
+    self.range_stack.append(self.range)
+    self.range = new_range
 
 
 # @staticmethod

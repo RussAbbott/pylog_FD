@@ -32,31 +32,24 @@ class FD_Var:
     self.id = FD_Var.id
     self.name = name if name is not None else f'V{str(self.id)}'
     self.range = init_range
-    # Make it a tuple so that we can make a set of FD_Vars
-    # self.range_stack = ()
     self.locked = False
     self.range_locked_stack = []
-    # super().__init__()
 
   def __hash__(self):
       return hash(self.id)
 
   def __str__(self):
-    name_part = '' if self.name is None else self.name + ': '
+    name_part = '' if self.name is None else self.name + ('*' if self.locked else '') + ': '
     (left, right) = ("{", "}")
-    return f'{name_part}{left}{", ".join([str(x) for x in self.range])}{right}{"*" if self.locked else ""}'
+    return f'{name_part}{left}{", ".join([str(x) for x in self.range])}{right}'
 
   def undo_update_range(self):
     (self.range, self.locked) = self.range_locked_stack[-1]
     self.range_locked_stack = self.range_locked_stack[:-1]
-    # self.locked = self.locked_stack[:-1]
-    # self.locked_stack = self.locked_stack[:-1]
 
   def update_range(self, new_range, locked=False):
     self.range_locked_stack = self.range_locked_stack + [(self.range, self.locked)]
-    # self.range_stack = self.range_stack + (self.range, )
     self.range = new_range
-    # self.locked_stack = self.locked_stack + [self.locked]
     self.locked = self.locked or locked
 
 
@@ -89,22 +82,27 @@ def siblings(all_diffs, nxt_var):
     return sibs
 
 
-# @Trace
 def tnvsl_FD(vars: Tuple[FD_Var], all_diffs: List[All_Different]):
+    # {FD_Var_x: {FD_Var_i that must be different from FD_Var_x}}
+    sibs_dict = {}
 
     @Trace
     def tnvsl_FD_aux(vars: Tuple[FD_Var]):
       if any(v for v in vars if not(v.range)): return None
       if any(ad for ad in all_diffs if not ad.all_diff()): return None
       uninstan_vars = [v for v in vars if len(v.range) > 1]
-      if not uninstan_vars: return vars
+      if not uninstan_vars:
+          # print(', '.join([f'{v.name}->[{", ".join([v1.name for v1 in sibs_dict[v]])}]' for v in sibs_dict]))
+          return vars
 
-      unlocked_vars = [v for v in vars if not v.locked]
-      nxt_var = list(unlocked_vars)[0] if not smallest_first else \
-                     min(unlocked_vars, key=lambda v: len(v.range))
+      unlocked_vars = {v for v in vars if not v.locked}
+      nxt_var = unlocked_vars.pop() if not smallest_first else \
+                min(unlocked_vars, key=lambda v: len(v.range))
       for val in nxt_var.range:
-          nxt_var.update_range({val}, True)
-          sibs = siblings(all_diffs, nxt_var)
+          nxt_var.update_range({val}, locked=True)
+          if nxt_var not in sibs_dict:
+            sibs_dict[nxt_var] = siblings(all_diffs, nxt_var)
+          sibs = sibs_dict[nxt_var]
           if propagate:
               for v in sibs:
                   v.update_range(v.range - {val})
@@ -121,8 +119,8 @@ def tnvsl_FD(vars: Tuple[FD_Var], all_diffs: List[All_Different]):
 
 if __name__ == '__main__':
     print()
-    for smallest_first in [False, True]:
-        for propagate in [False, True]:
+    for propagate in [False, True]:
+        for smallest_first in [False, True]:
             FD_Var.id = 0
             vars = tuple([FD_Var(init_range=set) for set in sets])
             all_diff = All_Different(vars)

@@ -6,41 +6,58 @@ from control_structures import Trace
 
 # Use this for all non-lv tests.
 # Is there a better example?
-# sets = [{1, 2, 3}, {1, 2, 4}, {1}]
-n = 5
-alpha_start = randint(97, 97+26-n)
-# sets = [set(sample(range(n), 3)) for _ in range(n)]
-sets = [set(chr(alpha_start+k) for k in sample(range(n), randint(2, n-1))) for _ in range(n)]
+nbr_sets = 5
 
-# propagate = True
-# smallest_first = True
+sets_size_low = 2
+sets_size_high = nbr_sets-1
 
+set_vals_size = nbr_sets
+set_range_start_max = 27-set_vals_size
+
+alpha_low = randint(ord('a'), ord('a')+set_range_start_max)
+set_vals = [chr(alpha_low+k) for k in range(set_vals_size)]
+sets = [frozenset(k for k in sample(set_vals, randint(sets_size_low, sets_size_high)))
+        for _ in range(nbr_sets)]
 
 class FD_Var:
   """
   A Finite Domain variable
   """
 
-  def __init__(self, name=None, init_range=frozenset({})):
+  id=0
+
+  def __init__(self, init_range=frozenset({}), name=None):
     # self.unification_chain_next points to the next element on the unification_chain, if any.
-    self.name = name
+    FD_Var.id += 1
+    self.id = FD_Var.id
+    self.name = name if name is not None else f'V{str(self.id)}'
     self.range = init_range
     # Make it a tuple so that we can make a set of FD_Vars
-    self.range_stack = ()
+    # self.range_stack = ()
+    self.locked = False
+    self.range_locked_stack = []
     # super().__init__()
+
+  def __hash__(self):
+      return hash(self.id)
 
   def __str__(self):
     name_part = '' if self.name is None else self.name + ': '
     (left, right) = ("{", "}")
-    return f'{name_part}{left}{", ".join([str(x) for x in self.range])}{right}'
+    return f'{name_part}{left}{", ".join([str(x) for x in self.range])}{right}{"*" if self.locked else ""}'
 
   def undo_update_range(self):
-    self.range = self.range_stack[-1]
-    self.range_stack = self.range_stack[:-1]
+    (self.range, self.locked) = self.range_locked_stack[-1]
+    self.range_locked_stack = self.range_locked_stack[:-1]
+    # self.locked = self.locked_stack[:-1]
+    # self.locked_stack = self.locked_stack[:-1]
 
-  def update_range(self, new_range):
-    self.range_stack = self.range_stack + (self.range, )
+  def update_range(self, new_range, locked=False):
+    self.range_locked_stack = self.range_locked_stack + [(self.range, self.locked)]
+    # self.range_stack = self.range_stack + (self.range, )
     self.range = new_range
+    # self.locked_stack = self.locked_stack + [self.locked]
+    self.locked = self.locked or locked
 
 
 class All_Different:
@@ -72,7 +89,7 @@ def siblings(all_diffs, nxt_var):
     return sibs
 
 
-@Trace
+# @Trace
 def tnvsl_FD(vars: Tuple[FD_Var], all_diffs: List[All_Different]):
 
     @Trace
@@ -82,11 +99,12 @@ def tnvsl_FD(vars: Tuple[FD_Var], all_diffs: List[All_Different]):
       uninstan_vars = [v for v in vars if len(v.range) > 1]
       if not uninstan_vars: return vars
 
-      nxt_var = list(uninstan_vars)[0] if not smallest_first else \
-                     min(uninstan_vars, key=lambda v: len(v.range))
+      unlocked_vars = [v for v in vars if not v.locked]
+      nxt_var = list(unlocked_vars)[0] if not smallest_first else \
+                     min(unlocked_vars, key=lambda v: len(v.range))
       for val in nxt_var.range:
+          nxt_var.update_range({val}, True)
           sibs = siblings(all_diffs, nxt_var)
-          nxt_var.update_range({val})
           if propagate:
               for v in sibs:
                   v.update_range(v.range - {val})
@@ -102,21 +120,18 @@ def tnvsl_FD(vars: Tuple[FD_Var], all_diffs: List[All_Different]):
 
 
 if __name__ == '__main__':
-    vars = tuple([FD_Var('V' + str(i+1), set) for (i, set) in enumerate(sets)])
-    all_diff = All_Different(vars)
-    # propagate = True
-    # smallest_first = False
     print()
     for smallest_first in [False, True]:
         for propagate in [False, True]:
-            vars = tuple([FD_Var('V' + str(i+1), set) for (i, set) in enumerate(sets)])
+            FD_Var.id = 0
+            vars = tuple([FD_Var(init_range=set) for set in sets])
             all_diff = All_Different(vars)
             Trace.line_no = 0
-            print(f'{"*" * 90}')
+            print(f'{"~" * 90}')
+            print(f'smallest_first: {smallest_first}; propagate: {propagate};')
             print(f"First transversal: {Trace.to_str(tnvsl_FD(vars, [all_diff]))}")
             print(f'smallest_first: {smallest_first}; propagate: {propagate}; lines: {Trace.line_no}')
-            print(f'{"*" * 90}\n')
-    # print(f'{"=" * 70}')
+            print(f'{"~" * 90}\n')
 
 
 # @Trace

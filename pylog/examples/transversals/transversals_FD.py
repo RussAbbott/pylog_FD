@@ -10,7 +10,10 @@ from control_structures import Trace
 n = 5
 alpha_start = randint(97, 97+26-n)
 # sets = [set(sample(range(n), 3)) for _ in range(n)]
-sets = [set(chr(alpha_start+k) for k in sample(range(n), 3)) for _ in range(n)]
+sets = [set(chr(alpha_start+k) for k in sample(range(n), randint(2, n-1))) for _ in range(n)]
+
+# propagate = True
+# smallest_first = True
 
 
 class FD_Var:
@@ -31,7 +34,7 @@ class FD_Var:
     (left, right) = ("{", "}")
     return f'{name_part}{left}{", ".join([str(x) for x in self.range])}{right}'
 
-  def undo_update(self):
+  def undo_update_range(self):
     self.range = self.range_stack[-1]
     self.range_stack = self.range_stack[:-1]
 
@@ -44,18 +47,29 @@ class All_Different:
     def __init__(self, vars):
         self.vars = vars
         self.used = set()
+        self.instantiated_vars = set()
 
     def __str__(self):
         return f'<{", ".join([v.name for v in vars])}>'
 
     def all_diff(self):
-        instantiated_vars = [v for v in self.vars if len(v.range) == 1]
+        instantiated_vars = {v for v in self.vars if len(v.range) == 1}
         vals = {list(v.range)[0] for v in instantiated_vars}
         return len(vals) == len(instantiated_vars)
+
+    # def update_all_diff(self):
+    #     new_instantiations = {v for v in self.vars if not v in self.instantiated_vars and len(v.range) == 1}
+
 
 
 def flatten_sets_to_set(sets):
     return {elt for set in sets for elt in set}
+
+
+def siblings(all_diffs, nxt_var):
+    sibs = set(v for ad in all_diffs if nxt_var in ad.vars
+                 for v in ad.vars if v is not nxt_var)
+    return sibs
 
 
 @Trace
@@ -68,12 +82,21 @@ def tnvsl_FD(vars: Tuple[FD_Var], all_diffs: List[All_Different]):
       uninstan_vars = [v for v in vars if len(v.range) > 1]
       if not uninstan_vars: return vars
 
-      nxt_var = list(uninstan_vars)[0]
+      nxt_var = list(uninstan_vars)[0] if not smallest_first else \
+                     min(uninstan_vars, key=lambda v: len(v.range))
       for val in nxt_var.range:
+          sibs = siblings(all_diffs, nxt_var)
           nxt_var.update_range({val})
+          if propagate:
+              for v in sibs:
+                  v.update_range(v.range - {val})
           full_tnvsl = tnvsl_FD_aux(vars)
           if full_tnvsl is not None: return full_tnvsl
-          else: nxt_var.undo_update()
+          else:
+              nxt_var.undo_update_range()
+              if propagate:
+                for v in sibs:
+                  v.undo_update_range()
 
     return tnvsl_FD_aux(vars)
 
@@ -81,9 +104,19 @@ def tnvsl_FD(vars: Tuple[FD_Var], all_diffs: List[All_Different]):
 if __name__ == '__main__':
     vars = tuple([FD_Var('V' + str(i+1), set) for (i, set) in enumerate(sets)])
     all_diff = All_Different(vars)
-    print(f'\n{"=" * 50}')
-    print(f"\nFirst transversal: {Trace.to_str(tnvsl_FD(vars, [all_diff]))}")
-    print(f'{"=" * 50}')
+    # propagate = True
+    # smallest_first = False
+    print()
+    for smallest_first in [False, True]:
+        for propagate in [False, True]:
+            vars = tuple([FD_Var('V' + str(i+1), set) for (i, set) in enumerate(sets)])
+            all_diff = All_Different(vars)
+            Trace.line_no = 0
+            print(f'{"*" * 90}')
+            print(f"First transversal: {Trace.to_str(tnvsl_FD(vars, [all_diff]))}")
+            print(f'smallest_first: {smallest_first}; propagate: {propagate}; lines: {Trace.line_no}')
+            print(f'{"*" * 90}\n')
+    # print(f'{"=" * 70}')
 
 
 # @Trace

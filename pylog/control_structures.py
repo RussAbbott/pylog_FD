@@ -162,6 +162,7 @@ def forany(gens):
 
 class Trace:
   trace = True
+  line_no = 0
 
   def __init__(self, f):
     self.param_names = [param.name for param in signature(f).parameters.values()]
@@ -185,7 +186,7 @@ class Trace:
 
   @staticmethod
   def to_str(xs):
-    if type(xs) in [list, tuple]:
+    if type(xs) in [frozenset, list, set, tuple]:
       (left, right) = ('[', ']') if isinstance(xs, list) else ('(', ')')
       xs_string = f'{left}{", ".join(Trace.to_str(x) for x in xs)}{right}'
     else:
@@ -193,7 +194,8 @@ class Trace:
     return xs_string
 
   def trace_line(self, args):
-    prefix = "  " * self.depth
+    Trace.line_no += 1
+    prefix = f'{" " if Trace.line_no < 10 else ""} {Trace.line_no} {"  " * self.depth}'
     params = ", ".join([f'{param_name}: {Trace.to_str(arg)}'
                         for (param_name, arg) in zip(self.param_names, args)])
     # Special case for the transversal functions

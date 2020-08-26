@@ -67,6 +67,14 @@ class FD_Var:
     def is_instantiated(self):
         return len(self.range) == 1
 
+    def member_FD(self, a_list: List[Union[FD_Var, int, str]]):
+        """ Is v in a_list?  """
+        # If a_list is empty, it can't have a member. So fail.
+        if not a_list: return
+
+        yield from self.set_value(a_list[0])
+        yield from self.member_FD(a_list[1:])
+
     def propagate_value(self, value):
         for v in All_Different.sibs_dict[self]:
             v.update_range(v.range - {value})
@@ -99,7 +107,6 @@ class FD_Var:
 
 @Trace
 def FD_solver(vars: Set[FD_Var]):
-
     if any(not v.range for v in vars): return
     elif not All_Different.all_satisfied(): return
     elif all(v.is_instantiated() for v in vars): yield
@@ -107,10 +114,8 @@ def FD_solver(vars: Set[FD_Var]):
         not_set_vars: Set[FD_Var] = {v for v in vars if not v.was_set}
         nxt_var = min(not_set_vars, key=lambda v: len(v.range)) if FD_Var.smallest_first else \
                   not_set_vars.pop()
-
-        for elt in nxt_var.range:
-            for _ in nxt_var.set_value(elt):
-                yield from FD_solver(vars)
+        for _ in nxt_var.member_FD(list(nxt_var.range)):
+            yield from FD_solver(vars)
 
 
 def gen_sets(nbr_sets=5):
@@ -126,7 +131,6 @@ def gen_sets(nbr_sets=5):
 
 
 if __name__ == '__main__':
-    # Run transversal
     print()
     sets = gen_sets()
     for FD_Var.propagate in [False, True]:
@@ -154,19 +158,6 @@ if __name__ == '__main__':
 
 ##    ################################### Not currently used ###################################    ##
 
-def flatten_sets_to_set(sets):
-    return {elt for set in sets for elt in set}
-
-
-def member_FD(V: FD_Var, a_list: List[Union[FD_Var, int, str]]):
-    """ Is v in a_list?  """
-    # If a_list is empty, it can't have a member. So fail.
-    if not a_list: return
-
-    yield from unify_FD(V, a_list[0])
-    yield from member_FD(V, a_list[1:])
-
-
 def ensure_is_FD_Var(x: Union[FD_Var, int, str]) -> FD_Var:
     """
       Applied to each argument in a Structure.
@@ -175,6 +166,10 @@ def ensure_is_FD_Var(x: Union[FD_Var, int, str]) -> FD_Var:
       Wrap it in PyValue. (It must be immutable.)
     """
     return x if isinstance(x, FD_Var) else FD_Var({x})
+
+
+def flatten_sets_to_set(sets):
+    return {elt for set in sets for elt in set}
 
 
 @euc

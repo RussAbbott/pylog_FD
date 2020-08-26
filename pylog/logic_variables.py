@@ -41,9 +41,9 @@ def euc(f):
 
   @wraps(f)
   def euc_wrapper_non_gen(*args, **kwargs):
-    args = arg_Vars_unification_chain_ends(args)
+    args_unification_chain_ends = arg_Vars_unification_chain_ends(args)
     kwargs_unification_chain_ends = dict_Vars_unification_chain_ends(kwargs)
-    return f(*args, **kwargs_unification_chain_ends)
+    return f(*args_unification_chain_ends, **kwargs_unification_chain_ends)
 
   return euc_wrapper_gen if isgeneratorfunction(f) else euc_wrapper_non_gen
 

@@ -170,6 +170,7 @@ class Trace:
     self.depth = 0
 
   def __call__(self, *args):
+    Trace.line_no += 1
     if Trace.trace:
       print(self.trace_line(args))
     self.depth += 1
@@ -194,7 +195,6 @@ class Trace:
     return xs_string
 
   def trace_line(self, args):
-    Trace.line_no += 1
     prefix = f'{" " if Trace.line_no < 10 else ""} {Trace.line_no} {"  " * self.depth}'
     params = ", ".join([f'{param_name}: {Trace.to_str(arg)}'
                         for (param_name, arg) in zip(self.param_names, args)])

@@ -188,8 +188,9 @@ class Trace:
   @staticmethod
   def to_str(xs):
     if type(xs) in [frozenset, list, set, tuple]:
-      (left, right) = ('[', ']') if isinstance(xs, list) else ('(', ')')
-      xs_string = f'{left}{", ".join(Trace.to_str(x) for x in xs)}{right}'
+      # (left, right) = ('[', ']') if isinstance(xs, list) else ('(', ')')
+      # xs_string = f'{left}{", ".join(Trace.to_str(x) for x in xs)}{right}'
+      xs_string = ", ".join(Trace.to_str(x) for x in xs)
     else:
       xs_string = str(xs)
     return xs_string

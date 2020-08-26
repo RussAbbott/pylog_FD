@@ -10,21 +10,13 @@ from logic_variables import euc
 class All_Different:
 
     # sibs_dict = {FD_Var_x: {FD_Var_i that must be different from FD_Var_x}}
-    # Aggregated from all the All_Different declarations
+    # Aggregated from the All_Different declarations
     sibs_dict = {}
 
     def __init__(self, vars: Set[FD_Var]):
         self.vars = vars
         for v in vars:
             All_Different.sibs_dict[v] = All_Different.sibs_dict.setdefault(v, set()) | (vars - {v})
-
-    # def __str__(self):
-    #     return f'<{", ".join([v.name for v in vars])}>'
-    #
-    def all_diff(self):
-        instantiated_vars = {v for v in self.vars if v.is_instantiated()}
-        vals = {list(v.range)[0] for v in instantiated_vars}
-        return len(vals) == len(instantiated_vars)
 
     @staticmethod
     def all_satisfied():
@@ -57,8 +49,8 @@ class FD_Var:
         self.id = FD_Var.id
         self.name = name if name is not None else f'V{str(self.id)}'
         self.range = set() if init_range is None else init_range
-        self.was_set = False
         self.range_was_set_stack = []
+        self.was_set = False
         self.unification_chain_next = None
 
     def __eq__(self, other: FD_Var):
@@ -102,20 +94,15 @@ class FD_Var:
         self.was_set = self.was_set or was_set
 
     def value(self):
-        return list(self.range)[0] if len(self.range) == 1 else None
+        return list(self.range)[0] if self.is_instantiated() else None
 
 
 @Trace
 def FD_solver(vars: Set[FD_Var]):
 
-    if any(not v.range for v in vars):
-        return
-    elif not All_Different.all_satisfied():
-        return
-    elif all(v.is_instantiated() for v in vars):
-        yield
-        return
-
+    if any(not v.range for v in vars): return
+    elif not All_Different.all_satisfied(): return
+    elif all(v.is_instantiated() for v in vars): yield
     else:
         not_set_vars: Set[FD_Var] = {v for v in vars if not v.was_set}
         nxt_var = min(not_set_vars, key=lambda v: len(v.range)) if FD_Var.smallest_first else \
@@ -147,7 +134,7 @@ if __name__ == '__main__':
             FD_Var.id = 0
             All_Different.sibs_dict = {}
             # Create an FV_Var for each set
-            vars = {FD_Var(init_range=set) for set in sets}
+            vars = {FD_Var(set) for set in sets}
             All_Different(vars)
             print(Trace.to_str(vars))
             Trace.line_no = 0
